@@ -2,9 +2,17 @@
 
 # Ansible Role: Sudo Hardening
 
-> Standalone copy of `sudo_hardening` from the [iamenr0s.linux_hardening](https://github.com/iamenr0s/linux-hardening-collection) collection. Variables keep the collection-wide `linux_hardening_*` prefix.
+This role audits and hardens sudo on Debian/Ubuntu, RHEL/AlmaLinux/RockyLinux and Fedora servers. It writes one validated drop-in file, `/etc/sudoers.d/99-linux-hardening`, and never edits existing sudoers rules, so nobody loses privileges.
 
-Hardens sudo through one validated drop-in, `/etc/sudoers.d/99-linux-hardening`. It never edits existing sudoers rules, so nobody loses privileges. Only the `Defaults` below are set.
+Features
+--------
+- Audit mode by default: read-only, and reports every deviation. Changes need `linux_hardening_confirm_remediation: true`.
+- Sets only four `Defaults`: `use_pty`, `logfile`, `timestamp_timeout` and `!visiblepw`.
+- Validates the drop-in with `visudo -cf` before it reaches the live file.
+- Reports `NOPASSWD` / `!authenticate` rules but never removes them.
+- Installs sudo and adds the `#includedir` line when they are missing.
+- Backs up the drop-in file before changing it.
+- The only role in the `iamenr0s.linux_hardening` collection that writes sudoers settings.
 
 ## What it enforces
 | Setting | Default |
@@ -17,6 +25,9 @@ Hardens sudo through one validated drop-in, `/etc/sudoers.d/99-linux-hardening`.
 
 Reported only (never changed): `NOPASSWD` / `!authenticate` rules anywhere in sudoers, and a configuration that `visudo -c` rejects. Set `linux_hardening_sudo_allow_nopasswd: true` to accept passwordless rules (cloud images and automation accounts often need them).
 
+## Variable names
+Variables use the collection-wide `linux_hardening_*` prefix (shared with sibling roles) rather than `sudo_hardening_*`. Full list: `defaults/main.yml` and `meta/argument_specs.yml`. `linux_hardening_profile` is reserved here: this role applies the same Defaults for every profile.
+
 ## Modes
 `audit` (default) is read-only and sets `linux_hardening_sudo_findings` (`key, expected, actual, fixable`). `remediate` needs `linux_hardening_confirm_remediation: true`. After remediation only fixable findings fail the run.
 
@@ -24,11 +35,6 @@ Reported only (never changed): `NOPASSWD` / `!authenticate` rules anywhere in su
 - The drop-in is written with `validate: visudo -cf %s`, so a syntax error never reaches the live file; `visudo -c` checks the whole configuration afterwards.
 - Existing rules are untouched, so remediation cannot remove an admin's sudo rights. `use_pty` and `!visiblepw` can still affect unusual automation that runs sudo without a TTY or passes passwords visibly.
 - The drop-in file name has no dot (sudo ignores names with dots or ending in `~`).
-
-## Variables
-See `defaults/main.yml` and `meta/argument_specs.yml`.
-
-`linux_hardening_profile` is shared across the collection and is reserved here: this role applies the same Defaults for every profile.
 
 ## Example
 ```yaml
@@ -42,7 +48,7 @@ See `defaults/main.yml` and `meta/argument_specs.yml`.
 ```
 
 ## Verification
-Molecule `default` (remediate, idempotence, re-audit, mode 0440, `sudo -n true`, planted NOPASSWD rule untouched), `audit` (reports, writes nothing), `refuse`, `invalid` (a value that breaks syntax is rejected and no drop-in is written). Tested: AlmaLinux 9, Ubuntu 24.04, Debian 13.
+Molecule `default` (remediate, idempotence, re-audit, mode 0440, `sudo -n true`, planted NOPASSWD rule untouched), `audit` (reports, writes nothing), `refuse`, `invalid` (a value that breaks syntax is rejected and no drop-in is written). Tested: AlmaLinux 9, Ubuntu 24.04, Debian 13. CI matrix: AlmaLinux 8–10, Rocky 8–10, Fedora 42–44, Debian 12–13, Ubuntu 22.04/24.04.
 
 ## Rollback
 Delete `/etc/sudoers.d/99-linux-hardening` (a backup of any earlier version is kept when `linux_hardening_backup` is true).
