@@ -6,11 +6,7 @@
     update_cache: true
 
 - name: Check that the sudoers drop-in directory is included
-  ansible.builtin.command: grep -Eq '^\s*[#@]includedir\s+{{ linux_hardening_sudo_dropin_dir }}\s*$' {{ linux_hardening_sudo_main_file }}
-  register: __lh_sudo_inc
-  changed_when: false
-  failed_when: __lh_sudo_inc.rc > 1
-  check_mode: false
+  ansible.builtin.include_tasks: check_include.yml
 
 - name: Include the drop-in directory (validated with visudo)
   ansible.builtin.lineinfile:
@@ -19,7 +15,7 @@
     insertafter: EOF
     backup: "{{ linux_hardening_backup | bool }}"
     validate: visudo -cf %s
-  when: __lh_sudo_inc.rc == 1
+  when: __sudo_hardening_inc.rc == 1
 
 - name: Ensure the drop-in directory exists
   ansible.builtin.file:

@@ -3,18 +3,65 @@ argument_specs:
   main:
     short_description: Harden sudo with a validated sudoers drop-in; report passwordless rules.
     options:
-      linux_hardening_mode: {type: str, default: audit, choices: [audit, remediate], description: audit is read-only.}
-      linux_hardening_confirm_remediation: {type: bool, default: false, description: Must be true before remediate changes anything.}
-      linux_hardening_profile: {type: str, default: cis_level1, choices: [baseline, cis_level1, cis_level2], description: Security profile.}
-      linux_hardening_backup: {type: bool, default: true, description: Back up files edited in place.}
-      linux_hardening_verify: {type: bool, default: true, description: Re-audit after remediation.}
-      linux_hardening_fail_on_error: {type: bool, default: true, description: Fail the play when audit finds deviations.}
-      linux_hardening_sudo_enabled: {type: bool, default: true, description: Run the role.}
-      linux_hardening_sudo_main_file: {type: path, default: /etc/sudoers, description: Main sudoers file.}
-      linux_hardening_sudo_dropin_dir: {type: path, default: /etc/sudoers.d, description: Drop-in directory.}
-      linux_hardening_sudo_dropin_name: {type: str, default: 99-linux-hardening, description: Drop-in file name; must not contain a dot or end with a tilde.}
-      linux_hardening_sudo_use_pty: {type: bool, default: true, description: "Defaults use_pty."}
-      linux_hardening_sudo_logfile: {type: raw, default: /var/log/sudo.log, description: Defaults logfile (path); null leaves it unset.}
-      linux_hardening_sudo_timestamp_timeout: {type: raw, default: 15, description: Defaults timestamp_timeout in minutes (int); null leaves it unset.}
-      linux_hardening_sudo_disable_visiblepw: {type: bool, default: true, description: "Defaults !visiblepw."}
-      linux_hardening_sudo_allow_nopasswd: {type: bool, default: false, description: Do not report NOPASSWD and !authenticate rules.}
+      linux_hardening_mode:
+        type: str
+        default: audit
+        choices: [audit, remediate]
+        description: audit is read-only.
+      linux_hardening_confirm_remediation:
+        type: bool
+        default: false
+        description: Must be true before remediate changes anything.
+      linux_hardening_profile:
+        type: str
+        default: cis_level1
+        choices: [baseline, cis_level1, cis_level2]
+        description: Security profile.
+      linux_hardening_backup:
+        type: bool
+        default: true
+        description: Back up files edited in place.
+      linux_hardening_verify:
+        type: bool
+        default: true
+        description: Re-audit after remediation.
+      linux_hardening_fail_on_error:
+        type: bool
+        default: true
+        description: Fail the play when audit finds deviations.
+      linux_hardening_sudo_enabled:
+        type: bool
+        default: true
+        description: Run the role.
+      linux_hardening_sudo_main_file:
+        type: path
+        default: /etc/sudoers
+        description: Main sudoers file.
+      linux_hardening_sudo_dropin_dir:
+        type: path
+        default: /etc/sudoers.d
+        description: Drop-in directory.
+      linux_hardening_sudo_dropin_name:
+        type: str
+        default: 99-linux-hardening
+        description: Drop-in file name; must not contain a dot or end with a tilde.
+      linux_hardening_sudo_use_pty:
+        type: bool
+        default: true
+        description: Defaults use_pty.
+      linux_hardening_sudo_logfile:
+        type: raw
+        default: /var/log/sudo.log
+        description: Defaults logfile (path); null leaves it unset.
+      linux_hardening_sudo_timestamp_timeout:
+        type: raw
+        default: 15
+        description: Defaults timestamp_timeout in minutes (int); null leaves it unset.
+      linux_hardening_sudo_disable_visiblepw:
+        type: bool
+        default: true
+        description: Defaults !visiblepw.
+      linux_hardening_sudo_allow_nopasswd:
+        type: bool
+        default: false
+        description: Do not report NOPASSWD and !authenticate rules.

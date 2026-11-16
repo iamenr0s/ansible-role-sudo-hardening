@@ -1,0 +1,13 @@
+---
+# Sets __sudo_hardening_inc: rc 0 = included, 1 = missing.
+- name: Look for the includedir line in the main sudoers file
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -Eq
+      - '^\s*[#@]includedir\s+{{ linux_hardening_sudo_dropin_dir | regex_escape }}\s*$'
+      - "{{ linux_hardening_sudo_main_file }}"
+  register: __sudo_hardening_inc
+  changed_when: false
+  failed_when: __sudo_hardening_inc.rc > 1
+  check_mode: false

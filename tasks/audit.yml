@@ -3,87 +3,95 @@
 - name: Locate sudo
   ansible.builtin.stat:
     path: /usr/bin/sudo
-  register: __lh_sudo_bin
+  register: __sudo_hardening_bin
 
 - name: Inspect the configuration
-  when: __lh_sudo_bin.stat.exists
+  when: __sudo_hardening_bin.stat.exists
   block:
     - name: Validate the complete configuration
       ansible.builtin.command: visudo -c
-      register: __lh_sudo_check
+      register: __sudo_hardening_check
       changed_when: false
       failed_when: false
       check_mode: false
 
     - name: Check that the drop-in directory is included
-      ansible.builtin.command: grep -Eq '^\s*[#@]includedir\s+{{ linux_hardening_sudo_dropin_dir }}\s*$' {{ linux_hardening_sudo_main_file }}
-      register: __lh_sudo_inc
-      changed_when: false
-      failed_when: __lh_sudo_inc.rc > 1
-      check_mode: false
+      ansible.builtin.include_tasks: check_include.yml
 
     - name: Look at the drop-in
       ansible.builtin.stat:
         path: "{{ linux_hardening_sudo_dropin_dir }}/{{ linux_hardening_sudo_dropin_name }}"
-      register: __lh_sudo_file
+      register: __sudo_hardening_file
 
     - name: Read the drop-in
       ansible.builtin.slurp:
         src: "{{ linux_hardening_sudo_dropin_dir }}/{{ linux_hardening_sudo_dropin_name }}"
-      register: __lh_sudo_content
-      when: __lh_sudo_file.stat.exists
+      register: __sudo_hardening_content
+      when: __sudo_hardening_file.stat.exists
 
     - name: Look for passwordless sudo rules
-      ansible.builtin.command: >-
-        grep -rnE '^[^#]*(NOPASSWD|!authenticate)'
-        {{ linux_hardening_sudo_main_file }} {{ linux_hardening_sudo_dropin_dir }}
-      register: __lh_sudo_nopw
+      ansible.builtin.command:
+        argv:
+          - grep
+          - -rnE
+          - '^[^#]*(NOPASSWD|!authenticate)'
+          - "{{ linux_hardening_sudo_main_file }}"
+          - "{{ linux_hardening_sudo_dropin_dir }}"
+      register: __sudo_hardening_nopw
       changed_when: false
-      failed_when: __lh_sudo_nopw.rc > 1
+      failed_when: __sudo_hardening_nopw.rc > 1
       check_mode: false
-
-- name: Compare with desired state
-  ansible.builtin.set_fact:
-    __lh_sudo_findings: >-
-      {%- set out = [] -%}
-      {%- if not __lh_sudo_bin.stat.exists -%}
-      {%- set _ = out.append({'key': 'sudo', 'expected': 'installed', 'actual': 'missing', 'fixable': true}) -%}
-      {%- else -%}
-      {%- if __lh_sudo_check.rc != 0 -%}
-      {%- set _ = out.append({'key': 'visudo -c', 'expected': 'valid configuration', 'actual': (__lh_sudo_check.stderr_lines | default([]) | first | default('error')), 'fixable': false}) -%}
-      {%- endif -%}
-      {%- if __lh_sudo_inc.rc == 1 -%}
-      {%- set _ = out.append({'key': 'includedir ' ~ linux_hardening_sudo_dropin_dir, 'expected': 'present in ' ~ linux_hardening_sudo_main_file, 'actual': 'missing', 'fixable': true}) -%}
-      {%- endif -%}
-      {%- if not __lh_sudo_file.stat.exists
-             or (__lh_sudo_content.content | b64decode) != lookup('ansible.builtin.template', 'sudoers_dropin.j2')
-             or __lh_sudo_file.stat.mode != '0440' or __lh_sudo_file.stat.pw_name != 'root' -%}
-      {%- set _ = out.append({'key': 'drop-in ' ~ linux_hardening_sudo_dropin_name, 'expected': 'present with the hardened Defaults', 'actual': 'missing or different', 'fixable': true}) -%}
-      {%- endif -%}
-      {%- if not (linux_hardening_sudo_allow_nopasswd | bool) -%}
-      {%- for l in __lh_sudo_nopw.stdout_lines -%}
-      {%- set _ = out.append({'key': 'passwordless sudo: ' ~ l, 'expected': 'password required', 'actual': 'NOPASSWD or !authenticate', 'fixable': false}) -%}
-      {%- endfor -%}
-      {%- endif -%}
-      {%- endif -%}
-      {{ out | to_json }}
 
 - name: Record findings
   ansible.builtin.set_fact:
-    linux_hardening_sudo_findings: "{{ __lh_sudo_findings | from_json }}"
+    linux_hardening_sudo_findings: >-
+      {{ __sudo_hardening_missing_sudo
+         if not __sudo_hardening_bin.stat.exists
+         else __sudo_hardening_invalid_config + __sudo_hardening_missing_include
+              + __sudo_hardening_bad_dropin + __sudo_hardening_passwordless }}
+  vars:
+    __sudo_hardening_missing_sudo:
+      - {key: sudo, expected: installed, actual: missing, fixable: true}
+    __sudo_hardening_invalid_config: >-
+      {{ [] if __sudo_hardening_check.rc == 0 else [{
+           'key': 'visudo -c', 'expected': 'valid configuration', 'fixable': false,
+           'actual': __sudo_hardening_check.stderr_lines | default([]) | first | default('error')}] }}
+    __sudo_hardening_missing_include: >-
+      {{ [] if __sudo_hardening_inc.rc == 0 else [{
+           'key': 'includedir ' ~ linux_hardening_sudo_dropin_dir, 'actual': 'missing', 'fixable': true,
+           'expected': 'present in ' ~ linux_hardening_sudo_main_file}] }}
+    __sudo_hardening_dropin_ok: >-
+      {{ __sudo_hardening_file.stat.exists
+         and __sudo_hardening_file.stat.mode == '0440'
+         and __sudo_hardening_file.stat.pw_name == 'root'
+         and (__sudo_hardening_content.content | b64decode)
+             == lookup('ansible.builtin.template', 'sudoers_dropin.j2') }}
+    __sudo_hardening_bad_dropin: >-
+      {{ [] if __sudo_hardening_dropin_ok else [{
+           'key': 'drop-in ' ~ linux_hardening_sudo_dropin_name, 'fixable': true,
+           'expected': 'present with the hardened Defaults', 'actual': 'missing or different'}] }}
+    # One finding per NOPASSWD / !authenticate line; a human has to decide, so never fixable.
+    __sudo_hardening_passwordless: >-
+      {{ [] if linux_hardening_sudo_allow_nopasswd | bool else
+         dict(__sudo_hardening_nopw.stdout_lines
+              | map('regex_replace', '^', 'passwordless sudo: ')
+              | zip_longest([], fillvalue='NOPASSWD or !authenticate'))
+         | dict2items(value_name='actual')
+         | map('combine', {'expected': 'password required', 'fixable': false})
+         | list }}
 
 - name: Report sudo_hardening result
   ansible.builtin.debug:
     msg: "{{ 'COMPLIANT' if linux_hardening_sudo_findings | length == 0 else linux_hardening_sudo_findings }}"
 
-# After remediation only fixable findings fail the run; the others need a human.
+# Verify after remediation: only fixable findings are fatal, the rest need a human.
+# Plain audit: every finding is fatal when linux_hardening_fail_on_error is set.
 - name: Fail on findings
   ansible.builtin.fail:
-    msg: "sudo_hardening found {{ __lh_sudo_blocking | length }} deviation(s)."
+    msg: "sudo_hardening found {{ __sudo_hardening_blocking | length }} deviation(s)."
   vars:
-    __lh_sudo_blocking: >-
-      {{ linux_hardening_sudo_findings
-         if (linux_hardening_fail_on_error | bool) and not (__lh_sudo_audit_fatal | default(false))
-         else linux_hardening_sudo_findings | selectattr('fixable') | list
-         if (__lh_sudo_audit_fatal | default(false)) else [] }}
-  when: __lh_sudo_blocking | length > 0
+    __sudo_hardening_blocking: >-
+      {{ linux_hardening_sudo_findings | selectattr('fixable') | list
+         if __sudo_hardening_audit_fatal | default(false)
+         else (linux_hardening_sudo_findings if linux_hardening_fail_on_error | bool else []) }}
+  when: __sudo_hardening_blocking | length > 0
