@@ -71,6 +71,7 @@
            'key': 'drop-in ' ~ linux_hardening_sudo_dropin_name, 'fixable': true,
            'expected': 'present with the hardened Defaults', 'actual': 'missing or different'}] }}
     # One finding per NOPASSWD / !authenticate line; a human has to decide, so never fixable.
+    # Builds a list of {key, expected, actual, fixable}: grep lines -> prefixed keys -> dict -> list of dicts.
     __sudo_hardening_passwordless: >-
       {{ [] if linux_hardening_sudo_allow_nopasswd | bool else
          dict(__sudo_hardening_nopw.stdout_lines

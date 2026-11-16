@@ -1,9 +1,14 @@
 ---
+- name: Locate sudo
+  ansible.builtin.stat:
+    path: /usr/bin/sudo
+  register: __sudo_hardening_bin
+
 - name: Ensure sudo is installed
   ansible.builtin.package:
     name: sudo
     state: present
-    update_cache: true
+    update_cache: "{{ not __sudo_hardening_bin.stat.exists }}"  # refresh metadata only when installing
 
 - name: Check that the sudoers drop-in directory is included
   ansible.builtin.include_tasks: check_include.yml
