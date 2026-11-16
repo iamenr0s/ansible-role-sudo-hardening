@@ -2,7 +2,7 @@
 # --- Shared collection variables ---
 linux_hardening_mode: audit                    # audit (read-only) | remediate
 linux_hardening_confirm_remediation: false     # must be true for any change
-linux_hardening_profile: cis_level1
+linux_hardening_profile: cis_level1            # reserved: this role ignores it
 linux_hardening_backup: true
 linux_hardening_verify: true
 linux_hardening_fail_on_error: true

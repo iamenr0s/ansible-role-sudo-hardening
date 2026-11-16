@@ -28,6 +28,8 @@ Reported only (never changed): `NOPASSWD` / `!authenticate` rules anywhere in su
 ## Variables
 See `defaults/main.yml` and `meta/argument_specs.yml`.
 
+`linux_hardening_profile` is shared across the collection and is reserved here: this role applies the same Defaults for every profile.
+
 ## Example
 ```yaml
 - hosts: all

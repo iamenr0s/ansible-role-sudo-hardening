@@ -16,7 +16,7 @@ argument_specs:
         type: str
         default: cis_level1
         choices: [baseline, cis_level1, cis_level2]
-        description: Security profile.
+        description: Shared collection variable. Reserved; this role applies the same Defaults for every profile.
       linux_hardening_backup:
         type: bool
         default: true
