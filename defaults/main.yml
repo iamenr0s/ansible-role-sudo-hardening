@@ -1,0 +1,25 @@
+---
+# --- Shared collection variables ---
+linux_hardening_mode: audit                    # audit (read-only) | remediate
+linux_hardening_confirm_remediation: false     # must be true for any change
+linux_hardening_profile: cis_level1
+linux_hardening_backup: true
+linux_hardening_verify: true
+linux_hardening_fail_on_error: true
+
+# --- sudo_hardening ---
+linux_hardening_sudo_enabled: true
+linux_hardening_sudo_main_file: /etc/sudoers
+linux_hardening_sudo_dropin_dir: /etc/sudoers.d
+# Sorts last so its Defaults win over earlier files.
+linux_hardening_sudo_dropin_name: 99-linux-hardening
+
+# Defaults written to the drop-in
+linux_hardening_sudo_use_pty: true
+linux_hardening_sudo_logfile: /var/log/sudo.log   # null = do not set
+linux_hardening_sudo_timestamp_timeout: 15        # minutes; null = do not set
+linux_hardening_sudo_disable_visiblepw: true
+
+# NOPASSWD / !authenticate entries elsewhere are only reported. Set true to accept them
+# (cloud images and automation accounts often need them).
+linux_hardening_sudo_allow_nopasswd: false

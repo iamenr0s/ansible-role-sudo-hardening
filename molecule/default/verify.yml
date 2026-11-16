@@ -1,0 +1,41 @@
+---
+- name: Verify
+  hosts: all
+  become: false
+  gather_facts: true
+  tasks:
+    - name: Audit again, without failing
+      ansible.builtin.include_role:
+        name: "{{ playbook_dir }}/../.."  # noqa: role-name[path]
+      vars:
+        linux_hardening_mode: audit
+        linux_hardening_fail_on_error: false
+
+    - name: Only the report-only finding (passwordless rule) is left
+      ansible.builtin.assert:
+        that:
+          - linux_hardening_sudo_findings | length == 1
+          - "'90-lh-test' in linux_hardening_sudo_findings[0].key"
+          - not linux_hardening_sudo_findings[0].fixable
+        quiet: true
+
+    - name: Inspect the result
+      ansible.builtin.command: "{{ item }}"
+      loop:
+        - stat -c %a:%U /etc/sudoers.d/99-linux-hardening
+        - visudo -c
+        - sudo -n true
+        - sudo -V
+      register: __v
+      changed_when: false
+
+    - name: Assert mode, validity, working sudo and the logfile setting
+      ansible.builtin.assert:
+        that:
+          - __v.results[0].stdout == '440:root'
+          - "'/var/log/sudo.log' in __v.results[3].stdout"
+        quiet: true
+
+    - name: The planted rule is untouched
+      ansible.builtin.command: grep -q NOPASSWD /etc/sudoers.d/90-lh-test
+      changed_when: false

@@ -1,0 +1,25 @@
+---
+- name: Converge (audit only)
+  hosts: all
+  become: false
+  gather_facts: true
+  tasks:
+    - name: Audit
+      ansible.builtin.include_role:
+        name: "{{ playbook_dir }}/../.."  # noqa: role-name[path]
+      vars:
+        linux_hardening_mode: audit
+        linux_hardening_fail_on_error: false
+
+    - name: Missing drop-in and the passwordless rule are reported
+      ansible.builtin.assert:
+        that:
+          - linux_hardening_sudo_findings | map(attribute='key') | select('search', '^drop-in') | list | length == 1
+          - linux_hardening_sudo_findings | map(attribute='key') | select('search', 'passwordless') | list | length == 1
+        quiet: true
+
+    - name: Nothing was written
+      ansible.builtin.stat:
+        path: /etc/sudoers.d/99-linux-hardening
+      register: __f
+      failed_when: __f.stat.exists

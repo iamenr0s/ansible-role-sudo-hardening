@@ -1,0 +1,14 @@
+{{ ansible_managed | comment }}
+# iamenr0s.linux_hardening.sudo_hardening. Do not edit.
+{% if linux_hardening_sudo_use_pty | bool %}
+Defaults use_pty
+{% endif %}
+{% if linux_hardening_sudo_logfile is not none %}
+Defaults logfile="{{ linux_hardening_sudo_logfile }}"
+{% endif %}
+{% if linux_hardening_sudo_timestamp_timeout is not none %}
+Defaults timestamp_timeout={{ linux_hardening_sudo_timestamp_timeout }}
+{% endif %}
+{% if linux_hardening_sudo_disable_visiblepw | bool %}
+Defaults !visiblepw
+{% endif %}

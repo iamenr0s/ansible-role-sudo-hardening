@@ -1,0 +1,35 @@
+---
+# audit: read-only. remediate: install sudo, make sure the drop-in dir is included, write a
+# validated drop-in. Existing sudoers rules are never edited, so nobody loses privileges.
+- name: Run sudo_hardening
+  when: linux_hardening_sudo_enabled | bool
+  block:
+    - name: Validate linux_hardening_mode
+      ansible.builtin.assert:
+        that: linux_hardening_mode in ['audit', 'remediate']
+        fail_msg: "linux_hardening_mode must be 'audit' or 'remediate', got '{{ linux_hardening_mode }}'"
+        quiet: true
+
+    - name: Audit (read-only)
+      ansible.builtin.include_tasks: audit.yml
+      when: linux_hardening_mode == 'audit'
+
+    - name: Remediate
+      when: linux_hardening_mode == 'remediate'
+      block:
+        - name: Require explicit remediation confirmation
+          ansible.builtin.assert:
+            that: linux_hardening_confirm_remediation | bool
+            fail_msg: >-
+              Remediation changes sudo configuration. Set linux_hardening_confirm_remediation: true
+              to proceed (run with linux_hardening_mode: audit to preview).
+            quiet: true
+
+        - name: Configure
+          ansible.builtin.include_tasks: configure.yml
+
+        - name: Verify effective configuration
+          ansible.builtin.include_tasks: audit.yml
+          vars:
+            __lh_sudo_audit_fatal: true
+          when: linux_hardening_verify | bool

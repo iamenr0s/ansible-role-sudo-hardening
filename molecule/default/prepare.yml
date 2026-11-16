@@ -1,0 +1,21 @@
+---
+# sudo plus a passwordless rule that the role must report but never touch.
+- name: Prepare
+  hosts: all
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Install sudo
+      ansible.builtin.package:
+        name: sudo
+        state: present
+        update_cache: true
+
+    - name: Plant a passwordless rule
+      ansible.builtin.copy:
+        content: "lh_test ALL=(ALL) NOPASSWD: ALL\n"
+        dest: /etc/sudoers.d/90-lh-test
+        owner: root
+        group: root
+        mode: "0440"
+        validate: visudo -cf %s

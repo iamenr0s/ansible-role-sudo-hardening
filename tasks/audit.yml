@@ -1,0 +1,89 @@
+---
+# Read-only. Findings carry fixable: true when remediation can fix them.
+- name: Locate sudo
+  ansible.builtin.stat:
+    path: /usr/bin/sudo
+  register: __lh_sudo_bin
+
+- name: Inspect the configuration
+  when: __lh_sudo_bin.stat.exists
+  block:
+    - name: Validate the complete configuration
+      ansible.builtin.command: visudo -c
+      register: __lh_sudo_check
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Check that the drop-in directory is included
+      ansible.builtin.command: grep -Eq '^\s*[#@]includedir\s+{{ linux_hardening_sudo_dropin_dir }}\s*$' {{ linux_hardening_sudo_main_file }}
+      register: __lh_sudo_inc
+      changed_when: false
+      failed_when: __lh_sudo_inc.rc > 1
+      check_mode: false
+
+    - name: Look at the drop-in
+      ansible.builtin.stat:
+        path: "{{ linux_hardening_sudo_dropin_dir }}/{{ linux_hardening_sudo_dropin_name }}"
+      register: __lh_sudo_file
+
+    - name: Read the drop-in
+      ansible.builtin.slurp:
+        src: "{{ linux_hardening_sudo_dropin_dir }}/{{ linux_hardening_sudo_dropin_name }}"
+      register: __lh_sudo_content
+      when: __lh_sudo_file.stat.exists
+
+    - name: Look for passwordless sudo rules
+      ansible.builtin.command: >-
+        grep -rnE '^[^#]*(NOPASSWD|!authenticate)'
+        {{ linux_hardening_sudo_main_file }} {{ linux_hardening_sudo_dropin_dir }}
+      register: __lh_sudo_nopw
+      changed_when: false
+      failed_when: __lh_sudo_nopw.rc > 1
+      check_mode: false
+
+- name: Compare with desired state
+  ansible.builtin.set_fact:
+    __lh_sudo_findings: >-
+      {%- set out = [] -%}
+      {%- if not __lh_sudo_bin.stat.exists -%}
+      {%- set _ = out.append({'key': 'sudo', 'expected': 'installed', 'actual': 'missing', 'fixable': true}) -%}
+      {%- else -%}
+      {%- if __lh_sudo_check.rc != 0 -%}
+      {%- set _ = out.append({'key': 'visudo -c', 'expected': 'valid configuration', 'actual': (__lh_sudo_check.stderr_lines | default([]) | first | default('error')), 'fixable': false}) -%}
+      {%- endif -%}
+      {%- if __lh_sudo_inc.rc == 1 -%}
+      {%- set _ = out.append({'key': 'includedir ' ~ linux_hardening_sudo_dropin_dir, 'expected': 'present in ' ~ linux_hardening_sudo_main_file, 'actual': 'missing', 'fixable': true}) -%}
+      {%- endif -%}
+      {%- if not __lh_sudo_file.stat.exists
+             or (__lh_sudo_content.content | b64decode) != lookup('ansible.builtin.template', 'sudoers_dropin.j2')
+             or __lh_sudo_file.stat.mode != '0440' or __lh_sudo_file.stat.pw_name != 'root' -%}
+      {%- set _ = out.append({'key': 'drop-in ' ~ linux_hardening_sudo_dropin_name, 'expected': 'present with the hardened Defaults', 'actual': 'missing or different', 'fixable': true}) -%}
+      {%- endif -%}
+      {%- if not (linux_hardening_sudo_allow_nopasswd | bool) -%}
+      {%- for l in __lh_sudo_nopw.stdout_lines -%}
+      {%- set _ = out.append({'key': 'passwordless sudo: ' ~ l, 'expected': 'password required', 'actual': 'NOPASSWD or !authenticate', 'fixable': false}) -%}
+      {%- endfor -%}
+      {%- endif -%}
+      {%- endif -%}
+      {{ out | to_json }}
+
+- name: Record findings
+  ansible.builtin.set_fact:
+    linux_hardening_sudo_findings: "{{ __lh_sudo_findings | from_json }}"
+
+- name: Report sudo_hardening result
+  ansible.builtin.debug:
+    msg: "{{ 'COMPLIANT' if linux_hardening_sudo_findings | length == 0 else linux_hardening_sudo_findings }}"
+
+# After remediation only fixable findings fail the run; the others need a human.
+- name: Fail on findings
+  ansible.builtin.fail:
+    msg: "sudo_hardening found {{ __lh_sudo_blocking | length }} deviation(s)."
+  vars:
+    __lh_sudo_blocking: >-
+      {{ linux_hardening_sudo_findings
+         if (linux_hardening_fail_on_error | bool) and not (__lh_sudo_audit_fatal | default(false))
+         else linux_hardening_sudo_findings | selectattr('fixable') | list
+         if (__lh_sudo_audit_fatal | default(false)) else [] }}
+  when: __lh_sudo_blocking | length > 0

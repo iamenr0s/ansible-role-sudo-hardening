@@ -1,0 +1,12 @@
+---
+- name: Converge (remediate)
+  hosts: all
+  become: false
+  gather_facts: true
+  tasks:
+    - name: Remediate
+      ansible.builtin.include_role:
+        name: "{{ playbook_dir }}/../.."  # noqa: role-name[path]
+      vars:
+        linux_hardening_mode: remediate
+        linux_hardening_confirm_remediation: true

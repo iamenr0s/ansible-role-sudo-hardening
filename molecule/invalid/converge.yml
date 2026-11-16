@@ -1,0 +1,34 @@
+---
+# A value that breaks sudoers syntax must be rejected by visudo before it reaches the live file.
+- name: Converge (invalid input is rejected)
+  hosts: all
+  become: false
+  gather_facts: true
+  tasks:
+    - name: Remediate with a broken value
+      block:
+        - name: Remediate
+          ansible.builtin.include_role:
+            name: "{{ playbook_dir }}/../.."  # noqa: role-name[path]
+          vars:
+            linux_hardening_mode: remediate
+            linux_hardening_confirm_remediation: true
+            linux_hardening_sudo_logfile: '/var/log/x" bad'
+        - name: Fail if the role accepted it
+          ansible.builtin.fail:
+            msg: Role wrote an invalid sudoers drop-in.
+      rescue:
+        - name: Assert the failure came from validation
+          ansible.builtin.assert:
+            that: "'visudo' in (ansible_failed_result.msg | default('')) or 'validat' in (ansible_failed_result.msg | default(''))"
+            quiet: true
+
+    - name: Live sudo configuration is still valid and no drop-in was written
+      ansible.builtin.command: visudo -c
+      changed_when: false
+
+    - name: No drop-in
+      ansible.builtin.stat:
+        path: /etc/sudoers.d/99-linux-hardening
+      register: __f
+      failed_when: __f.stat.exists
