@@ -1,6 +1,6 @@
 ---
 # Sets __sudo_hardening_inc: rc 0 = included, 1 = missing.
-- name: Look for the includedir line in the main sudoers file
+- name: check_include | Look for the includedir line in the main sudoers file
   ansible.builtin.command:
     argv:
       - grep
