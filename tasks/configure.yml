@@ -1,19 +1,19 @@
 ---
-- name: Locate sudo
+- name: configure | Locate sudo
   ansible.builtin.stat:
     path: /usr/bin/sudo
   register: __sudo_hardening_bin
 
-- name: Ensure sudo is installed
+- name: configure | Ensure sudo is installed
   ansible.builtin.package:
     name: sudo
     state: present
     update_cache: "{{ not __sudo_hardening_bin.stat.exists }}"  # refresh metadata only when installing
 
-- name: Check that the sudoers drop-in directory is included
+- name: configure | Check that the sudoers drop-in directory is included
   ansible.builtin.include_tasks: check_include.yml
 
-- name: Include the drop-in directory (validated with visudo)
+- name: configure | Include the drop-in directory (validated with visudo)
   ansible.builtin.lineinfile:
     path: "{{ linux_hardening_sudo_main_file }}"
     line: "#includedir {{ linux_hardening_sudo_dropin_dir }}"
@@ -22,7 +22,7 @@
     validate: visudo -cf %s
   when: __sudo_hardening_inc.rc == 1
 
-- name: Ensure the drop-in directory exists
+- name: configure | Ensure the drop-in directory exists
   ansible.builtin.file:
     path: "{{ linux_hardening_sudo_dropin_dir }}"
     state: directory
@@ -30,7 +30,7 @@
     group: root
     mode: "0750"
 
-- name: Write the sudo hardening drop-in (a syntax error never reaches the live file)
+- name: configure | Write the sudo hardening drop-in (a syntax error never reaches the live file)
   ansible.builtin.template:
     src: sudoers_dropin.j2
     dest: "{{ linux_hardening_sudo_dropin_dir }}/{{ linux_hardening_sudo_dropin_name }}"
@@ -40,7 +40,7 @@
     backup: "{{ linux_hardening_backup | bool }}"
     validate: visudo -cf %s
 
-- name: Check the complete sudo configuration
+- name: configure | Check the complete sudo configuration
   ansible.builtin.command: visudo -c
   changed_when: false
   check_mode: false

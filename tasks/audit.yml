@@ -1,35 +1,35 @@
 ---
 # Read-only. Findings carry fixable: true when remediation can fix them.
-- name: Locate sudo
+- name: audit | Locate sudo
   ansible.builtin.stat:
     path: /usr/bin/sudo
   register: __sudo_hardening_bin
 
-- name: Inspect the configuration
+- name: audit | Inspect the configuration
   when: __sudo_hardening_bin.stat.exists
   block:
-    - name: Validate the complete configuration
+    - name: audit | Validate the complete configuration
       ansible.builtin.command: visudo -c
       register: __sudo_hardening_check
       changed_when: false
       failed_when: false
       check_mode: false
 
-    - name: Check that the drop-in directory is included
+    - name: audit | Check that the drop-in directory is included
       ansible.builtin.include_tasks: check_include.yml
 
-    - name: Look at the drop-in
+    - name: audit | Look at the drop-in
       ansible.builtin.stat:
         path: "{{ linux_hardening_sudo_dropin_dir }}/{{ linux_hardening_sudo_dropin_name }}"
       register: __sudo_hardening_file
 
-    - name: Read the drop-in
+    - name: audit | Read the drop-in
       ansible.builtin.slurp:
         src: "{{ linux_hardening_sudo_dropin_dir }}/{{ linux_hardening_sudo_dropin_name }}"
       register: __sudo_hardening_content
       when: __sudo_hardening_file.stat.exists
 
-    - name: Look for passwordless sudo rules
+    - name: audit | Look for passwordless sudo rules
       ansible.builtin.command:
         argv:
           - grep
@@ -42,7 +42,7 @@
       failed_when: __sudo_hardening_nopw.rc > 1
       check_mode: false
 
-- name: Record findings
+- name: audit | Record findings
   ansible.builtin.set_fact:
     linux_hardening_sudo_findings: >-
       {{ __sudo_hardening_missing_sudo
@@ -81,13 +81,13 @@
          | map('combine', {'expected': 'password required', 'fixable': false})
          | list }}
 
-- name: Report sudo_hardening result
+- name: audit | Report sudo_hardening result
   ansible.builtin.debug:
     msg: "{{ 'COMPLIANT' if linux_hardening_sudo_findings | length == 0 else linux_hardening_sudo_findings }}"
 
 # Verify after remediation: only fixable findings are fatal, the rest need a human.
 # Plain audit: every finding is fatal when linux_hardening_fail_on_error is set.
-- name: Fail on findings
+- name: audit | Fail on findings
   ansible.builtin.fail:
     msg: "sudo_hardening found {{ __sudo_hardening_blocking | length }} deviation(s)."
   vars:
