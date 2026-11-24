@@ -36,11 +36,36 @@ Variables use the collection-wide `linux_hardening_*` prefix (shared with siblin
 - Existing rules are untouched, so remediation cannot remove an admin's sudo rights. `use_pty` and `!visiblepw` can still affect unusual automation that runs sudo without a TTY or passes passwords visibly.
 - The drop-in file name has no dot (sudo ignores names with dots or ending in `~`).
 
+## Role Variables
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `linux_hardening_mode` | str | `audit` | audit is read-only. Choices: `audit`, `remediate`. |
+| `linux_hardening_confirm_remediation` | bool | `false` | Must be true before remediate changes anything. |
+| `linux_hardening_profile` | str | `cis_level1` | Shared collection variable. Reserved; this role applies the same Defaults for every profile. Choices: `baseline`, `cis_level1`, `cis_level2`. |
+| `linux_hardening_backup` | bool | `true` | Back up files edited in place. |
+| `linux_hardening_verify` | bool | `true` | Re-audit after remediation. |
+| `linux_hardening_fail_on_error` | bool | `true` | Fail the play when audit finds deviations. |
+| `linux_hardening_sudo_enabled` | bool | `true` | Run the role. |
+| `linux_hardening_sudo_main_file` | path | `/etc/sudoers` | Main sudoers file. |
+| `linux_hardening_sudo_dropin_dir` | path | `/etc/sudoers.d` | Drop-in directory. |
+| `linux_hardening_sudo_dropin_name` | str | `99-linux-hardening` | Drop-in file name; must not contain a dot or end with a tilde. |
+| `linux_hardening_sudo_use_pty` | bool | `true` | Defaults use_pty. |
+| `linux_hardening_sudo_logfile` | raw | `/var/log/sudo.log` | Defaults logfile (path); null leaves it unset. |
+| `linux_hardening_sudo_timestamp_timeout` | raw | `15` | Defaults timestamp_timeout in minutes (int); null leaves it unset. |
+| `linux_hardening_sudo_disable_visiblepw` | bool | `true` | Defaults !visiblepw. |
+| `linux_hardening_sudo_allow_nopasswd` | bool | `false` | Do not report NOPASSWD and !authenticate rules. |
+
+**Check mode:** `remediate` with `--check --diff` shows what would change without writing anything; the post-remediation re-audit is skipped in check mode.
+
+**Idempotent:** yes. A second `remediate` run reports no changes (the Molecule `idempotence` step checks this).
+
 ## Example
 ```yaml
 - hosts: all
+  become: true
   roles:
-    - role: iamenr0s.linux_hardening.sudo_hardening
+    - role: iamenr0s.sudo_hardening
       vars:
         linux_hardening_mode: remediate
         linux_hardening_confirm_remediation: true
