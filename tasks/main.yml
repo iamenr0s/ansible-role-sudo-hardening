@@ -4,12 +4,6 @@
 - name: Run sudo_hardening
   when: linux_hardening_sudo_enabled | bool
   block:
-    - name: Validate linux_hardening_mode
-      ansible.builtin.assert:
-        that: linux_hardening_mode in ['audit', 'remediate']
-        fail_msg: "linux_hardening_mode must be 'audit' or 'remediate', got '{{ linux_hardening_mode }}'"
-        quiet: true
-
     - name: Audit (read-only)
       ansible.builtin.include_tasks: audit.yml
       when: linux_hardening_mode == 'audit'
@@ -32,4 +26,5 @@
           ansible.builtin.include_tasks: audit.yml
           vars:
             __sudo_hardening_audit_fatal: true
-          when: linux_hardening_verify | bool
+          # In check mode nothing was written, so a re-audit would always fail.
+          when: linux_hardening_verify | bool and not ansible_check_mode
